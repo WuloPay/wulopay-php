@@ -8,8 +8,7 @@ namespace WuloPay;
  */
 final class CheckoutSessions
 {
-    /** @var Client */
-    private $client;
+    private readonly Client $client;
 
     public function __construct(Client $client)
     {

@@ -1,7 +1,7 @@
 # WuloPay PHP library
 
-Take card payments on WuloPay's secure payment page from any PHP application. Works with PHP 7.4 and newer,
-needs only the `curl` and `json` extensions.
+Take card payments on WuloPay's secure payment page from any PHP application. Needs PHP 8.2 or newer (supported PHP
+versions only) and the `curl` and `json` extensions.
 
 ```
 composer require wulopay/wulopay-php

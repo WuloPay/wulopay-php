@@ -2,6 +2,7 @@
 
 namespace WuloPay\Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use WuloPay\Client;
 use WuloPay\Exception\AuthenticationException;
@@ -107,7 +108,7 @@ final class ClientTest extends TestCase
         self::assertSame('https://sandbox.wulopay.com/api/v1/Checkout/Sessions/cs_1%2F..%2Fx/Cancel', $http->requests[1]['url']);
     }
 
-    /** @dataProvider errors */
+    #[DataProvider('errors')]
     public function testMapsErrors(int $status, string $class): void
     {
         $http = $this->token(new FakeHttpClient())->queue($status, ['error' => 'Something specific.'], ['retry-after' => '30']);
@@ -123,7 +124,7 @@ final class ClientTest extends TestCase
         }
     }
 
-    public function errors(): array
+    public static function errors(): array
     {
         return [[400, InvalidRequestException::class], [403, PermissionException::class], [404, NotFoundException::class],
                 [409, ConflictException::class], [429, RateLimitException::class]];
