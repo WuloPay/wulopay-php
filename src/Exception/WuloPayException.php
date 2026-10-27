@@ -5,8 +5,7 @@ namespace WuloPay\Exception;
 /** Base class for every error the library throws. */
 class WuloPayException extends \RuntimeException
 {
-    /** @var int|null */
-    private $httpStatus;
+    private ?int $httpStatus;
 
     public function __construct(string $message, ?int $httpStatus = null, ?\Throwable $previous = null)
     {

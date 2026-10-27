@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.0.0
+- Requires PHP 8.2 or newer.
 - Checkout sessions: create (with Idempotency-Key), retrieve, cancel, refund.
 - Access tokens fetched, cached (optionally in a shared cache) and refreshed automatically.
 - Webhook signature verification (`Webhook::constructEvent`).

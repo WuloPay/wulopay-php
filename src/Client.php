@@ -24,25 +24,16 @@ final class Client
     public const VERSION = '1.0.0';
     public const SANDBOX_BASE_URL = 'https://sandbox.wulopay.com/api/v1';
 
-    /** @var CheckoutSessions */
-    public $checkoutSessions;
+    public readonly CheckoutSessions $checkoutSessions;
 
-    /** @var string */
-    private $keyId;
-    /** @var string */
-    private $secret;
-    /** @var string */
-    private $baseUrl;
-    /** @var int */
-    private $timeout;
-    /** @var HttpClientInterface */
-    private $http;
-    /** @var TokenCacheInterface|null */
-    private $tokenCache;
-    /** @var string|null */
-    private $token;
-    /** @var int */
-    private $tokenExpiresAt = 0;
+    private string $keyId;
+    private string $secret;
+    private string $baseUrl;
+    private int $timeout;
+    private HttpClientInterface $http;
+    private ?TokenCacheInterface $tokenCache;
+    private ?string $token = null;
+    private int $tokenExpiresAt = 0;
 
     /**
      * @param array{baseUrl?:string, timeout?:int, httpClient?:HttpClientInterface, tokenCache?:TokenCacheInterface} $options

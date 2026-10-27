@@ -5,8 +5,7 @@ namespace WuloPay\Exception;
 /** 429: too many requests; wait getRetryAfter() seconds (when known) and retry. */
 class RateLimitException extends WuloPayException
 {
-    /** @var int|null */
-    private $retryAfter;
+    private ?int $retryAfter;
 
     public function __construct(string $message, ?int $retryAfter = null)
     {
