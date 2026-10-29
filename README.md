@@ -74,6 +74,46 @@ $wulopay->checkoutSessions->refund($sessionId, 20.00, 'Damaged'); // part of it
 $wulopay->checkoutSessions->cancel($sessionId);                 // an unpaid session
 ```
 
+## Subscriptions
+
+Create a plan once, then send each new subscriber to a sign-up session. The shopper sees the terms, agrees, passes the
+bank's check and pays the first charge (or nothing, during a free trial). The card is stored on WuloPay's side; you only
+keep the subscription id.
+
+```php
+$plan = $wulopay->plans->create(['name' => 'Gold monthly', 'amount' => 49, 'interval' => 'month', 'trialDays' => 14]);
+
+$signup = $wulopay->checkoutSessions->create([
+    'mode' => 'subscription',
+    'subscription' => ['planId' => $plan['id'], 'billingMode' => 'wulopay'], // WuloPay charges every month
+    'reference' => $customerId,
+    'customer' => ['email' => $email, 'name' => $name],                      // required: receipts and notices
+    'returnUrl' => 'https://shop.example.co.za/account',
+]);
+header('Location: ' . $signup['url']);
+// webhook subscription.created: $event['data']['object']['id'] is the subscription id
+```
+
+**Two billing modes**
+
+- `wulopay`: WuloPay charges on the plan's schedule, retries failed payments (after 1, 3 and 5 days), e-mails the
+  shopper and gives them a page to update the card or cancel. You follow along by webhook
+  (`subscription.charge_succeeded`, `subscription.charge_failed`, `subscription.past_due`, `subscription.cancelled`, ...).
+- `merchant` (default): your system decides when to charge, e.g. a WooCommerce Subscriptions renewal. Set `maxAmount`
+  (the most a later charge may be, shown to the shopper) on the sign-up session, then:
+
+```php
+$charge = $wulopay->subscriptions->charge($subscriptionId, 'renewal-' . $orderId, 49);
+if ($charge['status'] === 'failed' && $charge['retryAllowed'] === false) {
+    // the card network says not to retry this card: send the shopper to save a new one
+    $update = $wulopay->subscriptions->createCardUpdateSession($subscriptionId, 'https://shop.example.co.za/account');
+}
+```
+
+The same idempotency key never charges twice. Also: `subscriptions->all($status)`, `retrieve`, `cancel($id, atPeriodEnd: true)`,
+`pause`, `resume`, `charges`, `createManageLink` (a link to the shopper's own subscription page). In the sandbox,
+`subscriptions->advance($id)` makes the next scheduled charge happen now, and a plan of R 60.00 always declines.
+
 ## Errors
 
 Every error extends `WuloPay\Exception\WuloPayException` (`getMessage()` is the API's explanation,

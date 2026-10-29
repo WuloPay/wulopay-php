@@ -142,4 +142,54 @@ final class ClientTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         new Client('wk_test', 'secret', ['baseUrl' => 'http://example.com']);
     }
+
+    public function testCreatesAPlanAndASubscriptionSignupWithoutAmount(): void
+    {
+        $http = $this->token(new FakeHttpClient())->queue(201, ['id' => 'plan_1'])->queue(201, ['id' => 'cs_1', 'mode' => 'subscription']);
+        $client = $this->client($http);
+        $plan = $client->plans->create(['name' => 'Gold', 'amount' => '49.004', 'interval' => 'month', 'trialDays' => 14]);
+        self::assertSame('https://sandbox.wulopay.com/api/v1/Billing/Plans', $http->requests[1]['url']);
+        self::assertSame(49.0, json_decode($http->requests[1]['body'], true)['amount']);
+        $client->checkoutSessions->create([
+            'mode' => 'subscription', 'subscription' => ['planId' => $plan['id'], 'billingMode' => 'wulopay'],
+            'reference' => 'SUB-1', 'customer' => ['email' => 'a@example.com'], 'returnUrl' => 'https://shop.example/r',
+        ]);
+        $body = json_decode($http->requests[2]['body'], true);
+        self::assertArrayNotHasKey('amount', $body);
+        self::assertSame(['planId' => 'plan_1', 'billingMode' => 'wulopay'], $body['subscription']);
+    }
+
+    public function testChargesWithTheIdempotencyKeyAndReturnsADeclinedCharge(): void
+    {
+        $http = $this->token(new FakeHttpClient())->queue(200, ['id' => 'ch_2', 'status' => 'failed', 'retryAllowed' => false]);
+        $charge = $this->client($http)->subscriptions->charge('sub_1', 'renewal-1043', 55);
+        $call = $http->requests[1];
+        self::assertSame('https://sandbox.wulopay.com/api/v1/Billing/Subscriptions/sub_1/Charges', $call['url']);
+        self::assertSame('renewal-1043', $call['headers']['Idempotency-Key']);
+        self::assertSame(['amount' => 55.0], json_decode($call['body'], true));
+        self::assertFalse($charge['retryAllowed']);
+    }
+
+    public function testRefusesAChargeWithoutAnIdempotencyKey(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->client(new FakeHttpClient())->subscriptions->charge('sub_1', '');
+    }
+
+    public function testCancelsAtPeriodEndListsByStatusAndCreatesLinks(): void
+    {
+        $http = $this->token(new FakeHttpClient())
+            ->queue(200, ['id' => 'sub_1', 'cancelAtPeriodEnd' => true])
+            ->queue(200, ['object' => 'list', 'data' => []])
+            ->queue(201, ['url' => 'https://pay-sandbox.wulopay.com/c/cs_9'])
+            ->queue(200, ['url' => 'https://pay-sandbox.wulopay.com/m/t']);
+        $subs = $this->client($http)->subscriptions;
+        $subs->cancel('sub_1', true);
+        self::assertSame(['atPeriodEnd' => true], json_decode($http->requests[1]['body'], true));
+        $subs->all('past_due', 10);
+        self::assertSame('https://sandbox.wulopay.com/api/v1/Billing/Subscriptions?status=past_due&limit=10', $http->requests[2]['url']);
+        $subs->createCardUpdateSession('sub_1', 'https://shop.example/account');
+        self::assertSame('https://sandbox.wulopay.com/api/v1/Billing/Subscriptions/sub_1/CardUpdateSession', $http->requests[3]['url']);
+        self::assertStringContainsString('/m/', $subs->createManageLink('sub_1')['url']);
+    }
 }

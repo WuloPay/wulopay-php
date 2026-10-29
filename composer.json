@@ -1,6 +1,6 @@
 {
     "name": "wulopay/wulopay-php",
-    "description": "PHP library for the WuloPay Hosted Checkout API: checkout sessions, refunds and signed webhooks.",
+    "description": "PHP library for the WuloPay Hosted Checkout API: checkout sessions, subscriptions, refunds and signed webhooks.",
     "type": "library",
     "license": "MIT",
     "keywords": [
