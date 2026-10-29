@@ -17,7 +17,7 @@ final class Plans
 
     /**
      * @param array{name:string, amount:float|int|string, interval:string, currency?:string, intervalCount?:int,
-     *              cycles?:int|null, trialDays?:int} $params interval is week, month or year; trialDays are free days
+     *              cycles?:int|null, trialDays?:int} $params interval is day, week, month or year; trialDays are free days
      *              before the first charge.
      * @return array<string,mixed>
      */
