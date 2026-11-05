@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1
+- No code changes from 1.2.0. Re-released after the repository history was tidied, so installs resolve to the current
+  commits. The User-Agent now reports 1.2.1.
+
 ## 1.2.0
 - Invoices (`$wulopay->invoices`: create with an idempotency key, all, retrieve, send, cancel) and payment links
   (`$wulopay->paymentLinks`: create, all, retrieve, cancel), for API v1.2.0. WuloPay works out invoice totals from the
