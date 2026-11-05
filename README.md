@@ -114,6 +114,27 @@ The same idempotency key never charges twice. Also: `subscriptions->all($status)
 `pause`, `resume`, `charges`, `createManageLink` (a link to the shopper's own subscription page). In the sandbox,
 `subscriptions->advance($id)` makes the next scheduled charge happen now, and a plan of R 60.00 always declines.
 
+## Invoices and payment links
+
+```php
+// WuloPay works out the tax and total from the lines (here R1,250 + 15% VAT = R1,437.50) and e-mails the customer.
+$invoice = $wulopay->invoices->create([
+    'reference' => 'INV-2026-0042',
+    'customer' => ['name' => 'Jane Doe', 'email' => 'jane@example.com'],
+    'lineItems' => [['name' => 'Website design', 'unitPrice' => 1250, 'taxRate' => 15]],
+    'dueDate' => '2026-11-30',
+], 'INV-2026-0042'); // idempotency key: a retry never makes (or e-mails) a second invoice
+// $invoice['amount'] is 1437.5 and $invoice['url'] the customer's payment page; listen for the invoice.paid webhook.
+
+// A link you share yourself; 'maxPayments' => 1 makes it single use.
+$link = $wulopay->paymentLinks->create(['description' => 'Workshop ticket', 'amount' => 150, 'maxPayments' => 40]);
+```
+
+Prices exclude tax unless `'pricesIncludeTax' => true`; `shipping` and `discount` are optional. Other calls:
+`invoices->all($status)`, `retrieve`, `send` (resend the e-mail), `cancel`; `paymentLinks->all`, `retrieve`
+(`timesPaid`, `amountCollected`), `cancel`. Webhooks: `invoice.paid`, `invoice.expired`, `payment_link.paid`.
+Scopes: `invoices.create` for invoices, `links.purchase.create` for links.
+
 ## Errors
 
 Every error extends `WuloPay\Exception\WuloPayException` (`getMessage()` is the API's explanation,
