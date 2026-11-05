@@ -21,7 +21,7 @@ use WuloPay\HttpClient\HttpClientInterface;
  */
 final class Client
 {
-    public const VERSION = '1.2.0';
+    public const VERSION = '1.2.1';
     public const SANDBOX_BASE_URL = 'https://sandbox.wulopay.com/api/v1';
 
     public readonly CheckoutSessions $checkoutSessions;
