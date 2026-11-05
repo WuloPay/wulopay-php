@@ -192,4 +192,74 @@ final class ClientTest extends TestCase
         self::assertSame('https://sandbox.wulopay.com/api/v1/Billing/Subscriptions/sub_1/CardUpdateSession', $http->requests[3]['url']);
         self::assertStringContainsString('/m/', $subs->createManageLink('sub_1')['url']);
     }
+
+    public function testCreatesAnInvoiceWithLinesRoundedAndAnIdempotencyKey(): void
+    {
+        $http = $this->token(new FakeHttpClient())->queue(201, ['id' => 'inv_1', 'object' => 'invoice', 'amount' => 1437.5]);
+        $invoice = $this->client($http)->invoices->create([
+            'customer' => ['name' => 'Jane Doe', 'email' => 'jane@example.com'],
+            'lineItems' => [['name' => 'Website design', 'unitPrice' => '1250.004', 'taxRate' => 15, 'discount' => '0.005']],
+            'shipping' => ['amount' => '99.999', 'taxRate' => 15],
+            'discount' => '10.001',
+            'dueDate' => '2026-11-30',
+            'send' => false,
+        ], 'INV-0042');
+
+        self::assertSame(1437.5, $invoice['amount']);
+        $create = $http->requests[1];
+        self::assertSame('POST', $create['method']);
+        self::assertSame('https://sandbox.wulopay.com/api/v1/Invoices', $create['url']);
+        self::assertSame('INV-0042', $create['headers']['Idempotency-Key']);
+        $body = json_decode($create['body'], true);
+        self::assertSame(['name' => 'Website design', 'unitPrice' => 1250.0, 'taxRate' => 15, 'discount' => 0.01], $body['lineItems'][0]);
+        self::assertSame(['amount' => 100.0, 'taxRate' => 15], $body['shipping']);
+        self::assertSame(10.0, $body['discount']);
+        self::assertFalse($body['send']);
+        self::assertArrayNotHasKey('amount', $body);
+    }
+
+    public function testListsRetrievesSendsAndCancelsInvoices(): void
+    {
+        $http = $this->token(new FakeHttpClient())
+            ->queue(200, ['object' => 'list', 'data' => [['id' => 'inv_1']]])
+            ->queue(200, ['id' => 'inv/1'])
+            ->queue(200, ['id' => 'inv_1', 'sentAt' => '2026-11-05T08:00:00Z'])
+            ->queue(200, ['id' => 'inv_1', 'status' => 'cancelled']);
+        $client = $this->client($http);
+        self::assertCount(1, $client->invoices->all('open', 10)['data']);
+        $client->invoices->retrieve('inv/1');
+        $client->invoices->send('inv_1');
+        self::assertSame('cancelled', $client->invoices->cancel('inv_1')['status']);
+        self::assertSame('https://sandbox.wulopay.com/api/v1/Invoices?status=open&limit=10', $http->requests[1]['url']);
+        self::assertSame('https://sandbox.wulopay.com/api/v1/Invoices/inv%2F1', $http->requests[2]['url']);
+        self::assertSame(['POST', 'https://sandbox.wulopay.com/api/v1/Invoices/inv_1/Send'], [$http->requests[3]['method'], $http->requests[3]['url']]);
+        self::assertSame('https://sandbox.wulopay.com/api/v1/Invoices/inv_1/Cancel', $http->requests[4]['url']);
+    }
+
+    public function testCreatesListsRetrievesAndCancelsPaymentLinks(): void
+    {
+        $http = $this->token(new FakeHttpClient())
+            ->queue(201, ['id' => 'plink_1', 'object' => 'payment_link', 'status' => 'active'])
+            ->queue(200, ['object' => 'list', 'data' => []])
+            ->queue(200, ['id' => 'plink_1', 'timesPaid' => 2, 'amountCollected' => 300.0])
+            ->queue(200, ['id' => 'plink_1', 'status' => 'cancelled']);
+        $client = $this->client($http);
+        $client->paymentLinks->create(['description' => 'Workshop ticket', 'amount' => '149.999', 'maxPayments' => 40], 'link-1');
+        self::assertSame(['description' => 'Workshop ticket', 'amount' => 150.0, 'maxPayments' => 40], json_decode($http->requests[1]['body'], true));
+        self::assertSame('link-1', $http->requests[1]['headers']['Idempotency-Key']);
+        $client->paymentLinks->all('completed');
+        self::assertSame('https://sandbox.wulopay.com/api/v1/PaymentLinks?status=completed', $http->requests[2]['url']);
+        self::assertEquals(300, $client->paymentLinks->retrieve('plink_1')['amountCollected']);
+        self::assertSame('cancelled', $client->paymentLinks->cancel('plink_1')['status']);
+    }
+
+    public function testATotalThatDisagreesIsAnInvalidRequest(): void
+    {
+        $http = $this->token(new FakeHttpClient())->queue(400, ['error' => "amount 1250.00 doesn't match the line items: 1437.50."]);
+        $this->expectException(\WuloPay\Exception\InvalidRequestException::class);
+        $this->expectExceptionMessage('1437.50');
+        $this->client($http)->invoices->create(['customer' => ['name' => 'A', 'email' => 'a@example.com'], 'amount' => 1250,
+            'lineItems' => [['name' => 'x', 'unitPrice' => 1250, 'taxRate' => 15]]]);
+    }
 }
+

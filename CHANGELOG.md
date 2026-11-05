@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0
+- Invoices (`$wulopay->invoices`: create with an idempotency key, all, retrieve, send, cancel) and payment links
+  (`$wulopay->paymentLinks`: create, all, retrieve, cancel), for API v1.2.0. WuloPay works out invoice totals from the
+  lines; money fields are rounded to cents before sending. Tested live against the sandbox.
+
 ## 1.1.0
 - Subscriptions: `$wulopay->plans` (create, all, retrieve); sign-up sessions with `'mode' => 'subscription'` (amount and
   currency come from the plan); `$wulopay->subscriptions` (all, retrieve, cancel, pause, resume, charge with a required
