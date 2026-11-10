@@ -43,6 +43,24 @@ final class ClientTest extends TestCase
         self::assertSame(150.0, json_decode($create['body'], true)['amount']);
     }
 
+    public function testSendsTwoDecimalAmountsWhateverTheServerPrecision(): void
+    {
+        $previous = ini_get('serialize_precision');
+        ini_set('serialize_precision', '17');
+        try {
+            $http = $this->token(new FakeHttpClient())->queue(201, ['id' => 'cs_1'])->queue(200, ['refundedThisTime' => 0.1]);
+            $client = $this->client($http);
+            $client->checkoutSessions->create(['amount' => 149.99, 'currency' => 'ZAR', 'reference' => '1', 'returnUrl' => 'https://shop.example/r'], 'k1');
+            $client->checkoutSessions->refund('cs_1', 0.1);
+            self::assertStringContainsString('"amount":149.99,', $http->requests[1]['body']);
+            self::assertStringContainsString('"amount":0.1', $http->requests[2]['body']);
+            self::assertStringNotContainsString('0000000', $http->requests[1]['body'] . $http->requests[2]['body']);
+            self::assertSame('17', ini_get('serialize_precision'), 'the server setting is restored');
+        } finally {
+            ini_set('serialize_precision', (string) $previous);
+        }
+    }
+
     public function testReusesTheTokenAcrossCalls(): void
     {
         $http = $this->token(new FakeHttpClient())->queue(200, ['id' => 'cs_1'])->queue(200, ['id' => 'cs_2']);
