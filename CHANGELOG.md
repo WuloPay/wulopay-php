@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.2
+- Fix: on servers with `serialize_precision = 17` (an old php.ini default still found on some hosts) amounts were sent
+  as, for example, `149.99000000000001` and the API refused them with "Amount can have at most 2 decimals". Request
+  bodies now always use the shortest exact form of each number; the server setting is restored afterwards.
+
 ## 1.2.1
 - No code changes from 1.2.0. Re-released after the repository history was tidied, so installs resolve to the current
   commits. The User-Agent now reports 1.2.1.

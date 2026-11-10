@@ -21,7 +21,7 @@ use WuloPay\HttpClient\HttpClientInterface;
  */
 final class Client
 {
-    public const VERSION = '1.2.1';
+    public const VERSION = '1.2.2';
     public const SANDBOX_BASE_URL = 'https://sandbox.wulopay.com/api/v1';
 
     public readonly CheckoutSessions $checkoutSessions;
@@ -134,13 +134,35 @@ final class Client
         $json = null;
         if ($body !== null) {
             // An empty PHP array would encode as [] but the API expects a JSON object.
-            $json = json_encode($body === [] ? new \stdClass() : $body, JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
-            if ($json === false) {
-                throw new \InvalidArgumentException('The request could not be encoded as JSON.');
-            }
+            $json = self::encode($body === [] ? new \stdClass() : $body);
             $headers['Content-Type'] = 'application/json';
         }
         return $this->http->request($method, $this->baseUrl . $path, $headers, $json, $this->timeout);
+    }
+
+    /**
+     * JSON with the shortest exact form of each number. Hosts that set serialize_precision = 17 (old php.ini
+     * defaults) would send 149.99 as 149.99000000000001, which the API rejects ("at most 2 decimals"), so the
+     * setting is -1 while encoding and restored afterwards.
+     *
+     * @param mixed $value
+     */
+    private static function encode($value): string
+    {
+        $previous = function_exists('ini_get') ? ini_get('serialize_precision') : false;
+        $changed = $previous !== false && $previous !== '-1' && function_exists('ini_set')
+            && ini_set('serialize_precision', '-1') !== false;
+        try {
+            $json = json_encode($value, JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
+        } finally {
+            if ($changed) {
+                ini_set('serialize_precision', (string) $previous);
+            }
+        }
+        if ($json === false) {
+            throw new \InvalidArgumentException('The request could not be encoded as JSON.');
+        }
+        return $json;
     }
 
     /** The API's { "error": "..." }, or the first message of a validation problem { "title", "errors": {...} }. */
