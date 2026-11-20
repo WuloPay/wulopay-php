@@ -279,5 +279,35 @@ final class ClientTest extends TestCase
         $this->client($http)->invoices->create(['customer' => ['name' => 'A', 'email' => 'a@example.com'], 'amount' => 1250,
             'lineItems' => [['name' => 'x', 'unitPrice' => 1250, 'taxRate' => 15]]]);
     }
-}
 
+    public function testSavedCards(): void
+    {
+        $card = ['id' => '0f0e9d1c-1111-4222-8333-944455566677', 'brand' => 'Visa', 'last4' => '4242', 'isDefault' => true, 'status' => 'active'];
+        $http = $this->token(new FakeHttpClient())
+            ->queue(200, [$card])
+            ->queue(200, $card + ['nickname' => 'Personal'])
+            ->queue(201, ['status' => 'requires_action', 'sessionId' => 'cs_p', 'url' => 'https://pay-sandbox.wulopay.com/c/cs_p'])
+            ->queue(204, '')
+            ->queue(204, '');
+        $client = $this->client($http);
+
+        $cards = $client->wallet->listCards('customer 1042');
+        self::assertSame('4242', $cards[0]['last4']);
+        self::assertSame('https://sandbox.wulopay.com/api/v1/Wallet/Customers/customer%201042/Cards', $http->requests[1]['url']);
+
+        $client->wallet->updateCard('customer-1042', $card['id'], ['nickname' => 'Personal']);
+        self::assertSame('PATCH', $http->requests[2]['method']);
+        self::assertSame(['nickname' => 'Personal'], json_decode($http->requests[2]['body'], true));
+
+        $payment = $client->wallet->pay('customer-1042', $card['id'], ['amount' => '149.999', 'reference' => '1043', 'returnUrl' => 'https://shop.example/r'], 'order-1043');
+        self::assertSame('requires_action', $payment['status']);
+        self::assertSame('https://sandbox.wulopay.com/api/v1/Wallet/Customers/customer-1042/Cards/' . $card['id'] . '/Payments', $http->requests[3]['url']);
+        self::assertSame(150.0, json_decode($http->requests[3]['body'], true)['amount']);
+        self::assertSame('order-1043', $http->requests[3]['headers']['Idempotency-Key']);
+
+        $client->wallet->removeCard('customer-1042', $card['id']);
+        self::assertSame('DELETE', $http->requests[4]['method']);
+        $client->wallet->deleteCustomer('customer-1042');
+        self::assertSame('https://sandbox.wulopay.com/api/v1/Wallet/Customers/customer-1042', $http->requests[5]['url']);
+    }
+}

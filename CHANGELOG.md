@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0
+- Saved cards (`$wulopay->wallet`): `upsertCustomer`, `retrieveCustomer`, `deleteCustomer`, `listCards`, `updateCard`,
+  `removeCard`, and `pay` (returns `requires_action` and a `url` where the shopper confirms with 3-D Secure). Checkout
+  sessions take `'mode' => 'save_card'`, `saveCard`, `customerReference` and `cardId`, and return `savedCard`.
+  Webhooks `card.saved`, `card.removed`, `card.expiring` and `card.expired`. For API v1.4.0.
+
 ## 1.2.2
 - Fix: on servers with `serialize_precision = 17` (an old php.ini default still found on some hosts) amounts were sent
   as, for example, `149.99000000000001` and the API refused them with "Amount can have at most 2 decimals". Request

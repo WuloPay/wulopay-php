@@ -135,6 +135,36 @@ Prices exclude tax unless `'pricesIncludeTax' => true`; `shipping` and `discount
 (`timesPaid`, `amountCollected`), `cancel`. Webhooks: `invoice.paid`, `invoice.expired`, `payment_link.paid`.
 Scopes: `invoices.create` for invoices, `links.purchase.create` for links.
 
+## Saved cards
+
+Name each shopper with your own `customerReference`. Cards are saved on WuloPay's page, so card numbers never reach
+your server. Keys need `wallet.read` and `wallet.write` (and `checkout.sessions.create` to pay).
+
+```php
+// 1. Save a card: the bank checks it, nothing is charged. Send the shopper to $save['url'].
+$save = $wulopay->checkoutSessions->create([
+    'mode' => 'save_card', 'customerReference' => 'customer-1042', 'reference' => 'save-1042',
+    'returnUrl' => 'https://shop.example.co.za/account/cards',
+]);
+// Or let the shopper save the card while paying: add 'saveCard' => true and 'customerReference' to a payment session.
+
+// 2. Show their cards (the card.saved webhook tells you when one is added).
+$cards = $wulopay->wallet->listCards('customer-1042');
+$wulopay->wallet->updateCard('customer-1042', $cards[0]['id'], ['nickname' => 'Personal', 'isDefault' => true]);
+
+// 3. Pay with a saved card: open $payment['url'] for the shopper, who confirms with 3-D Secure.
+$payment = $wulopay->wallet->pay('customer-1042', $cards[0]['id'],
+    ['amount' => 149.99, 'reference' => '1043', 'returnUrl' => 'https://shop.example.co.za/checkout/return'], 'order-1043');
+// Then confirm from checkout.session.completed, or $wulopay->checkoutSessions->retrieve($payment['sessionId']).
+
+// Remove a card, or a shopper with all their cards.
+$wulopay->wallet->removeCard('customer-1042', $cards[0]['id']);
+$wulopay->wallet->deleteCustomer('customer-1042');
+```
+
+`card.expiring` arrives 30 days before a card expires and `card.expired` after. Saving the same card again replaces
+the old one (`card.saved` lists it in `replaces`).
+
 ## Errors
 
 Every error extends `WuloPay\Exception\WuloPayException` (`getMessage()` is the API's explanation,
